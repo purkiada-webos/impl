@@ -4,7 +4,9 @@ import { useTheme } from '@/app/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useNotification } from '@/app/contexts/NotificationContext';
-import { addPoints } from '@/app/backend/PointsSystem';
+import { addPoints, setPoints, subtractPoints } from '@/app/backend/PointsSystem';
+import { unlockHint } from '@/app/backend/HintSystem';
+import { completeTask } from '@/app/backend/TaskSystem';
 
 const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
@@ -30,9 +32,111 @@ type Category = {
   component: () => JSX.Element;
 };
 
+export default function Settings() {
+  const [activeTab, setActiveTab] = useState('appearance');
+
+  return (
+    <div className="h-full flex">
+      {/* Sidebar */}
+      <div className="w-48 border-r border-gray-200 dark:border-gray-700 p-4 space-y-2">
+        <button
+          onClick={() => setActiveTab('appearance')}
+          className={`w-full text-left px-3 py-2 rounded ${
+            activeTab === 'appearance' ? 'bg-gray-200 dark:bg-gray-700' : ''
+          }`}
+        >
+          Appearance
+        </button>
+        <button
+          onClick={() => setActiveTab('network')}
+          className={`w-full text-left px-3 py-2 rounded ${
+            activeTab === 'network' ? 'bg-gray-200 dark:bg-gray-700' : ''
+          }`}
+        >
+          Network
+        </button>
+        <button
+          onClick={() => setActiveTab('privacy')}
+          className={`w-full text-left px-3 py-2 rounded ${
+            activeTab === 'privacy' ? 'bg-gray-200 dark:bg-gray-700' : ''
+          }`}
+        >
+          Privacy
+        </button>
+        {DEBUG_MODE && (
+          <button
+            onClick={() => setActiveTab('debug')}
+            className={`w-full text-left px-3 py-2 rounded ${
+              activeTab === 'debug' ? 'bg-gray-200 dark:bg-gray-700' : ''
+            }`}
+          >
+            Debug
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-6">
+        {activeTab === 'appearance' && <Appearance />}
+        {activeTab === 'network' && <Network />}
+        {activeTab === 'privacy' && <Privacy />}
+        {DEBUG_MODE && activeTab === 'debug' && <DebugSection />}
+      </div>
+    </div>
+  );
+}
+
 function Appearance() {
   const { isDarkMode, toggleDarkMode, background, setBackground, accentColor, setAccentColor } = useTheme();
-  
+  const { userId } = useAuth();
+  const { showNotification } = useNotification();
+
+  const handleModeChange = async () => {
+    const modeChange = localStorage.getItem("ThemeChanged");
+
+    if (modeChange === "0") {
+      localStorage.setItem("ThemeChanged", "1");
+      if (userId) {
+        const newTotal = await addPoints(userId, 5);
+        showNotification(`Task Completed! Added 5 points! New total: ${newTotal}`, 'success');
+        unlockHint(userId, 'customization', 'theme');
+        completeTask(userId, "mode_changed");
+      }
+    }
+
+    toggleDarkMode();
+  };
+
+  const handleAccentChange = async (accColor: string) => {
+    const accentChange = localStorage.getItem("AccentChanged");
+
+    if (accentChange === "0") {
+      localStorage.setItem("AccentChanged", "1");
+      if (userId) {
+        const newTotal = await addPoints(userId, 5);
+        showNotification(`Task Completed! Added 5 points! New total: ${newTotal}`, 'success');
+        unlockHint(userId, 'customization', 'accent');
+      }
+    }
+
+    setAccentColor(accColor);
+  };
+
+  const handleBackgroundChange = async (bg: string) => {
+    const backgroundChange = localStorage.getItem("BackgroundChanged");
+
+    if (backgroundChange === "0") {
+      localStorage.setItem("BackgroundChanged", "1");
+      if (userId) {
+        const newTotal = await addPoints(userId, 5);
+        showNotification(`Task Completed! Added 5 points! New total: ${newTotal}`, 'success');
+        unlockHint(userId, 'customization', 'background');
+      }
+    }
+
+    setBackground(bg);
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Appearance Settings</h2>
@@ -40,7 +144,7 @@ function Appearance() {
         <div className="flex items-center justify-between">
           <span>Dark Mode</span>
           <button 
-            onClick={toggleDarkMode}
+            onClick={handleModeChange}
             className={`px-3 py-1 rounded text-white transition-colors bg-${accentColor}-500 hover:bg-${accentColor}-600`}
           >
             {isDarkMode ? 'Enabled' : 'Disabled'}
@@ -53,7 +157,7 @@ function Appearance() {
             {accentColors.map((color) => (
               <button
                 key={color.value}
-                onClick={() => setAccentColor(color.value)}
+                onClick={() => handleAccentChange(color.value)}
                 className={`w-6 h-6 rounded-full border-2 transition-all ${
                   accentColor === color.value 
                     ? `border-${accentColor}-500 scale-110` 
@@ -70,7 +174,7 @@ function Appearance() {
           <span>Background</span>
           <select
             value={background}
-            onChange={(e) => setBackground(e.target.value)}
+            onChange={(e) => handleBackgroundChange(e.target.value)}
             className={`px-3 py-1 rounded bg-white dark:bg-gray-700 border border-${accentColor}-500`}
           >
             {backgrounds.map((bg) => (
@@ -115,20 +219,26 @@ function Privacy() {
   const { showNotification } = useNotification();
 
   const handleClearData = () => {
-    // Save authentication status
+    // Save authentication and theme status
     const isAuthenticated = localStorage.getItem('isAuthenticated');
     const userId = localStorage.getItem('userId');
     const username = localStorage.getItem('username');
+    const themeChanged = localStorage.getItem('ThemeChanged') || "0";
+    const accentChanged = localStorage.getItem('AccentChanged') || "0";
+    const backgroundChanged = localStorage.getItem('BackgroundChanged') || "0";
     
     // Clear all data
     localStorage.clear();
     
-    // Restore authentication to prevent logout
+    // Restore saved settings
     if (isAuthenticated) {
       localStorage.setItem('isAuthenticated', isAuthenticated);
       localStorage.setItem('userId', userId!);
       localStorage.setItem('username', username!);
     }
+    localStorage.setItem('ThemeChanged', themeChanged);
+    localStorage.setItem('AccentChanged', accentChanged);
+    localStorage.setItem('BackgroundChanged', backgroundChanged);
 
     // Reset settings to defaults
     setBackground('/wallpapers/mountains.jpg');
@@ -144,7 +254,6 @@ function Privacy() {
     localStorage.setItem('network_gateway', '192.168.1.1');
     localStorage.setItem('network_dns', '8.8.8.8');
 
-    // Show confirmation
     showNotification('All data has been cleared', 'success');
   };
 
@@ -323,31 +432,83 @@ function Network() {
 function DebugSection() {
   const { userId } = useAuth();
   const { showNotification } = useNotification();
+  const [pointsInput, setPointsInput] = useState('0');
 
-  const handleAddPoints = async () => {
+  const handleAddPoints = async (amount: number, message: string) => {
     if (!userId) {
       showNotification('No user logged in', 'error');
       return;
     }
 
     try {
-      const newTotal = await addPoints(userId, 10);
-      showNotification(`Added 10 points. New total: ${newTotal}`, 'success');
+      const newTotal = await addPoints(userId, amount);
+      showNotification(`${message} New total: ${newTotal}`, 'success');
     } catch (error) {
       console.error('Error adding points:', error);
       showNotification('Failed to add points', 'error');
     }
   };
 
+  const handleSubtractPoints = async (amount: number, message: string) => {
+    if (!userId) {
+      showNotification('No user logged in', 'error');
+      return;
+    }
+
+    try {
+      const newTotal = await subtractPoints(userId, amount);
+      showNotification(`${message} New total: ${newTotal}`, 'success');
+    } catch (error) {
+      console.error('Error subtracting points:', error);
+      showNotification('Failed to add points', 'error')
+    }
+  }
+
+  const handleSetPoints = async (amount: number, message: string) => {
+    if (!userId) {
+      showNotification('No user logged in', 'error');
+      return;
+    }
+
+    try {
+      const newTotal = await setPoints(userId, amount);
+      showNotification(`${message} New total: ${newTotal}`, 'success')
+    } catch (error) {
+      console.error('Error setting points:', error);
+      showNotification('Failed to set points', 'error')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium">Debug Tools</h2>
-      <div className="space-y-2">
+      <div className="space-y-2 space-x-2">
         <button
-          onClick={handleAddPoints}
+          onClick={() => handleAddPoints(10, "Added 10 points.")}
           className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded transition-colors"
         >
           Add 10 Points
+        </button>
+        <button
+          onClick={() => handleSubtractPoints(10, "Removed 10 points.")}
+          className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded transition-colors"
+        >
+          Subtract 10 Points
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="number"
+          value={pointsInput}
+          onChange={(e) => setPointsInput(e.target.value)}
+          className="px-4 py-2 bg-purple-500/10 text-purple-300 rounded w-24"
+          min="0"
+        />
+        <button
+          onClick={() => handleSetPoints(Number(pointsInput), `Set points to ${pointsInput}.`)}
+          className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded transition-colors"
+        >
+          Set Points
         </button>
       </div>
     </div>
@@ -359,58 +520,4 @@ const categories: Category[] = [
   { id: 'network', name: 'Network', icon: '🌐', component: Network },
   { id: 'notifications', name: 'Notifications', icon: '🔔', component: Notifications },
   { id: 'privacy', name: 'Privacy', icon: '🔒', component: Privacy },
-];
-
-export default function Settings() {
-  const [activeTab, setActiveTab] = useState('appearance');
-  
-  return (
-    <div className="h-full flex">
-      {/* Sidebar */}
-      <div className="w-48 border-r border-gray-200 dark:border-gray-700 p-4 space-y-2">
-        <button
-          onClick={() => setActiveTab('appearance')}
-          className={`w-full text-left px-3 py-2 rounded ${
-            activeTab === 'appearance' ? 'bg-gray-200 dark:bg-gray-700' : ''
-          }`}
-        >
-          Appearance
-        </button>
-        <button
-          onClick={() => setActiveTab('network')}
-          className={`w-full text-left px-3 py-2 rounded ${
-            activeTab === 'network' ? 'bg-gray-200 dark:bg-gray-700' : ''
-          }`}
-        >
-          Network
-        </button>
-        <button
-          onClick={() => setActiveTab('privacy')}
-          className={`w-full text-left px-3 py-2 rounded ${
-            activeTab === 'privacy' ? 'bg-gray-200 dark:bg-gray-700' : ''
-          }`}
-        >
-          Privacy
-        </button>
-        {DEBUG_MODE && (
-          <button
-            onClick={() => setActiveTab('debug')}
-            className={`w-full text-left px-3 py-2 rounded ${
-              activeTab === 'debug' ? 'bg-gray-200 dark:bg-gray-700' : ''
-            }`}
-          >
-            Debug
-          </button>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 p-6">
-        {activeTab === 'appearance' && <Appearance />}
-        {activeTab === 'network' && <Network />}
-        {activeTab === 'privacy' && <Privacy />}
-        {DEBUG_MODE && activeTab === 'debug' && <DebugSection />}
-      </div>
-    </div>
-  );
-} 
+]; 

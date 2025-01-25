@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { userId, action, amount } = await request.json();
 
-  if (!userId || !action || !amount) {
+  if (!userId || !action || amount === undefined) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
@@ -64,6 +64,9 @@ export async function POST(request: Request) {
       break;
     case 'subtract':
       data[userId] = Math.max(0, data[userId] - amount);
+      break;
+    case 'set':
+      data[userId] = Math.max(0, amount);
       break;
     default:
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

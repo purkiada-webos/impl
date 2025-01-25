@@ -55,6 +55,21 @@ export async function getPoints(userId: string): Promise<number> {
   }
 }
 
+export async function setPoints(userId: string, amount: number): Promise<number> {
+  try {
+    const response = await fetch('/api/points', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, action: 'set', amount })
+    });
+    const data = await response.json();
+    return data.points;
+  } catch (error) {
+    console.error('Error setting points:', error);
+    throw error;
+  }
+}
+
 /*
 
 // Initialize points for a new user

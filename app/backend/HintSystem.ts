@@ -110,6 +110,51 @@ export function isHintSeen(userId: string, category: string, hintId: string): bo
   return localStorage.getItem(hintKey) === 'true';
 }
 
+export async function unlockHint(userId: string, category: string, hintId: string): Promise<HintResult> {
+  try {
+    // Check if category exists
+    if (!hints[category]) {
+      return {
+        success: false,
+        message: 'Invalid hint category'
+      };
+    }
+
+    // Find the specific hint
+    const hint = hints[category].find(h => h.id === hintId);
+    if (!hint) {
+      return {
+        success: false,
+        message: 'Hint not found'
+      };
+    }
+
+    // Check if user has already unlocked this hint
+    const hintKey = `hint_${userId}_${category}_${hintId}`;
+    const hintUnlocked = localStorage.getItem(hintKey);
+    if (hintUnlocked) {
+      return {
+        success: false,
+        message: 'Hint already unlocked'
+      };
+    }
+
+    // Mark hint as unlocked
+    localStorage.setItem(hintKey, 'true');
+
+    return {
+      success: true,
+      message: 'Hint unlocked successfully',
+      hint: hint.text
+    };
+  } catch (error) {
+    console.error('Error unlocking hint:', error);
+    return {
+      success: false,
+      message: 'Error unlocking hint'
+    };
+  }
+}
 
 /*
 
