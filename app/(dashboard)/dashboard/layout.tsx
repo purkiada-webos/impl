@@ -9,6 +9,12 @@ import { getAllCategories, getAvailableHints, showHint, isHintSeen } from '@/app
 import { useNotification } from '@/app/contexts/NotificationContext';
 import { OSFileSystem } from '@/app/backend/terminal';
 
+declare global {
+  interface Window {
+    fs: OSFileSystem;
+  }
+}
+
 function Clock() {
   const [time, setTime] = useState<string>('');
 
@@ -140,22 +146,29 @@ function HintMenu({ userId }: { userId: string }) {
 
 function PointsCounter({ userId }: { userId: string }) {
   const [points, setPoints] = useState<number>(0);
-  const { refreshPoints } = usePoints();
+
+  const fetchPoints = async () => {
+    try {
+      const currentPoints = await getPoints(userId);
+      setPoints(currentPoints);
+    } catch (error) {
+      console.error('Error fetching points:', error);
+    }
+  };
 
   useEffect(() => {
-    async function fetchPoints() {
-      try {
-        const currentPoints = await getPoints(userId);
-        setPoints(currentPoints);
-      } catch (error) {
-        console.error('Error fetching points:', error);
-      }
-    }
-
     fetchPoints();
-    const interval = setInterval(fetchPoints, 5000);
-    return () => clearInterval(interval);
-  }, [userId, refreshPoints]);
+    
+    // Listen for points updates
+    const handlePointsUpdate = () => {
+      fetchPoints();
+    };
+    
+    window.addEventListener('pointsUpdated', handlePointsUpdate);
+    return () => {
+      window.removeEventListener('pointsUpdated', handlePointsUpdate);
+    };
+  }, [userId]);
 
   return (
     <div className="flex items-center gap-1.5 text-sm font-medium">
@@ -180,6 +193,7 @@ export default function DashboardLayout({
   const { background } = useTheme();
   const router = useRouter();
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const { showNotification } = useNotification();
 
   const refreshPoints = () => {
     setRefreshCounter(prev => prev + 1);
@@ -188,12 +202,27 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
+    } else {
+      // Check if first login
+      const hasSeenGuide = localStorage.getItem(`guide_shown_${userId}`);
+      if (!hasSeenGuide) {
+        setTimeout(() => {
+          showNotification(
+            'Welcome to PurkOS! Open the Guide app to view available tasks and hints.',
+            'info',
+            true
+          );
+          localStorage.setItem(`guide_shown_${userId}`, 'true');
+        }, 1000);
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, userId, showNotification]);
 
-  if (typeof window !== 'undefined') {
-    window.fs = new OSFileSystem();
-  }
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.fs = new OSFileSystem();
+    }
+  }, []); // Run once on component mount
 
   return (
     <PointsContext.Provider value={{ refreshPoints }}>

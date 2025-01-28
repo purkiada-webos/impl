@@ -1,6 +1,3 @@
-import mysql from 'mysql2/promise';
-import { pool } from './database';
-
 export async function initializePoints(userId: string): Promise<void> {
   try {
     await fetch('/api/points', {
@@ -22,6 +19,10 @@ export async function addPoints(userId: string, amount: number): Promise<number>
       body: JSON.stringify({ userId, action: 'add', amount })
     });
     const data = await response.json();
+    
+    // Trigger points refresh after successful update
+    window.dispatchEvent(new Event('pointsUpdated'));
+    
     return data.points;
   } catch (error) {
     console.error('Error adding points:', error);
@@ -37,6 +38,10 @@ export async function subtractPoints(userId: string, amount: number): Promise<nu
       body: JSON.stringify({ userId, action: 'subtract', amount })
     });
     const data = await response.json();
+    
+    // Trigger points refresh after successful update
+    window.dispatchEvent(new Event('pointsUpdated'));
+    
     return data.points;
   } catch (error) {
     console.error('Error subtracting points:', error);
@@ -63,6 +68,10 @@ export async function setPoints(userId: string, amount: number): Promise<number>
       body: JSON.stringify({ userId, action: 'set', amount })
     });
     const data = await response.json();
+    
+    // Trigger points refresh after successful update
+    window.dispatchEvent(new Event('pointsUpdated'));
+    
     return data.points;
   } catch (error) {
     console.error('Error setting points:', error);

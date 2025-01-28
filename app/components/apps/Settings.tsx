@@ -56,6 +56,14 @@ export default function Settings() {
           Network
         </button>
         <button
+          onClick={() => setActiveTab('firewall')}
+          className={`w-full text-left px-3 py-2 rounded ${
+            activeTab === 'firewall' ? 'bg-gray-200 dark:bg-gray-700' : ''
+          }`}
+        >
+          Firewall
+        </button>
+        <button
           onClick={() => setActiveTab('privacy')}
           className={`w-full text-left px-3 py-2 rounded ${
             activeTab === 'privacy' ? 'bg-gray-200 dark:bg-gray-700' : ''
@@ -79,6 +87,7 @@ export default function Settings() {
       <div className="flex-1 p-6">
         {activeTab === 'appearance' && <Appearance />}
         {activeTab === 'network' && <Network />}
+        {activeTab === 'firewall' && <Firewall />}
         {activeTab === 'privacy' && <Privacy />}
         {DEBUG_MODE && activeTab === 'debug' && <DebugSection />}
       </div>
@@ -92,49 +101,39 @@ function Appearance() {
   const { showNotification } = useNotification();
 
   const handleModeChange = async () => {
-    const modeChange = localStorage.getItem("ThemeChanged");
-
-    if (modeChange === "0") {
-      localStorage.setItem("ThemeChanged", "1");
-      if (userId) {
+    toggleDarkMode();
+    if (userId) {
+      const result = await completeTask(userId, "theme_change");
+      if (result.isFirstTime) {
         const newTotal = await addPoints(userId, 5);
         showNotification(`Task Completed! Added 5 points! New total: ${newTotal}`, 'success');
         unlockHint(userId, 'customization', 'theme');
-        completeTask(userId, "mode_changed");
       }
     }
-
-    toggleDarkMode();
   };
 
   const handleAccentChange = async (accColor: string) => {
-    const accentChange = localStorage.getItem("AccentChanged");
-
-    if (accentChange === "0") {
-      localStorage.setItem("AccentChanged", "1");
-      if (userId) {
+    setAccentColor(accColor);
+    if (userId) {
+      const result = await completeTask(userId, "accent_change");
+      if (result.isFirstTime) {
         const newTotal = await addPoints(userId, 5);
         showNotification(`Task Completed! Added 5 points! New total: ${newTotal}`, 'success');
         unlockHint(userId, 'customization', 'accent');
       }
     }
-
-    setAccentColor(accColor);
   };
 
   const handleBackgroundChange = async (bg: string) => {
-    const backgroundChange = localStorage.getItem("BackgroundChanged");
-
-    if (backgroundChange === "0") {
-      localStorage.setItem("BackgroundChanged", "1");
-      if (userId) {
+    setBackground(bg);
+    if (userId) {
+      const result = await completeTask(userId, "background_change");
+      if (result.isFirstTime) {
         const newTotal = await addPoints(userId, 5);
         showNotification(`Task Completed! Added 5 points! New total: ${newTotal}`, 'success');
         unlockHint(userId, 'customization', 'background');
       }
     }
-
-    setBackground(bg);
   };
 
   return (
@@ -169,20 +168,28 @@ function Appearance() {
             ))}
           </div>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <span>Background</span>
-          <select
-            value={background}
-            onChange={(e) => handleBackgroundChange(e.target.value)}
-            className={`px-3 py-1 rounded bg-white dark:bg-gray-700 border border-${accentColor}-500`}
-          >
+          <div className="flex gap-2">
             {backgrounds.map((bg) => (
-              <option key={bg.path} value={bg.path}>
-                {bg.name}
-              </option>
+              <button
+                key={bg.path}
+                onClick={() => handleBackgroundChange(bg.path)}
+                className={`w-12 h-8 rounded border-2 transition-all ${
+                  background === bg.path 
+                    ? `border-${accentColor}-500 scale-105` 
+                    : 'border-transparent'
+                }`}
+                style={{
+                  backgroundImage: `url(${bg.path})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+                title={bg.name}
+              />
             ))}
-          </select>
+          </div>
         </div>
       </div>
     </div>
@@ -262,10 +269,6 @@ function Privacy() {
       <h2 className="text-lg font-semibold">Privacy Settings</h2>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span>Analytics</span>
-          <button className="px-3 py-1 rounded bg-blue-500 text-white">Opt Out</button>
-        </div>
-        <div className="flex items-center justify-between">
           <span>Clear Data</span>
           <button 
             onClick={handleClearData}
@@ -282,11 +285,17 @@ function Privacy() {
 function Network() {
   const { showNotification } = useNotification();
   const { accentColor } = useTheme();
+  const { userId } = useAuth();
   
-  // Initialize state from localStorage or use defaults
+  // Define correct network settings
+  const CORRECT_SETTINGS = {
+    ip: '192.168.1.42',
+    subnet: '255.255.255.0',
+    dns: '8.8.4.4'
+  };
+  
   const [ethernetEnabled, setEthernetEnabled] = useState(() => {
-    const saved = localStorage.getItem('network_ethernet');
-    return saved ? JSON.parse(saved) : true;
+    return localStorage.getItem('network_ethernet') === 'true';
   });
   
   const [ipAddress, setIpAddress] = useState(() => {
@@ -304,6 +313,47 @@ function Network() {
   const [dns, setDns] = useState(() => {
     return localStorage.getItem('network_dns') || '8.8.8.8';
   });
+
+  // Apply changes and check if settings are correct
+  const handleApply = async () => {
+    showNotification('Applying network settings...', 'info', true);
+    
+    // Check if settings are correct
+    const isCorrect = 
+      ipAddress === CORRECT_SETTINGS.ip &&
+      subnet === CORRECT_SETTINGS.subnet &&
+      dns === CORRECT_SETTINGS.dns;
+
+    if (isCorrect) {
+      const result = await completeTask(userId, 'network_config');
+      if (result.isFirstTime) {
+        const newTotal = await addPoints(userId!, 15);
+        showNotification(`Network configured correctly! Added 15 points! New total: ${newTotal}`, 'success');
+        unlockHint(userId!, 'network', 'config');
+        setEthernetEnabled(true);
+        localStorage.setItem('network_ethernet', 'true');
+      } else {
+        showNotification('Network settings applied successfully', 'success');
+        setEthernetEnabled(true);
+        localStorage.setItem('network_ethernet', 'true');
+      }
+    } else {
+      showNotification('Network configuration incorrect. Internet remains disconnected.', 'error');
+      setEthernetEnabled(false);
+      localStorage.setItem('network_ethernet', 'false');
+    }
+  };
+
+  // Reset to defaults (incorrect settings)
+  const handleReset = () => {
+    setEthernetEnabled(false);
+    setIpAddress('192.168.1.100');
+    setSubnet('255.255.255.0');
+    setGateway('192.168.1.1');
+    setDns('8.8.8.8');
+    localStorage.setItem('network_ethernet', 'false');
+    showNotification('Network settings reset to defaults', 'info');
+  };
 
   // Save settings when they change
   useEffect(() => {
@@ -326,27 +376,6 @@ function Network() {
     localStorage.setItem('network_dns', dns);
   }, [dns]);
 
-  // Reset to defaults
-  const handleReset = () => {
-    setEthernetEnabled(true);
-    setIpAddress('192.168.1.100');
-    setSubnet('255.255.255.0');
-    setGateway('192.168.1.1');
-    setDns('8.8.8.8');
-    showNotification('Network settings reset to defaults', 'info');
-  };
-
-  // Apply changes (in a real app, this would apply network settings)
-  const handleApply = () => {
-    // Show a persistent notification that requires manual closing
-    showNotification('Applying network settings...', 'info', true);
-    
-    // Simulate network configuration
-    setTimeout(() => {
-      showNotification('Network settings applied successfully', 'success');
-    }, 2000);
-  };
-
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Network Settings</h2>
@@ -354,14 +383,13 @@ function Network() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span>Ethernet</span>
-          <button 
-            onClick={() => setEthernetEnabled(!ethernetEnabled)}
+          <div 
             className={`px-3 py-1 rounded text-white transition-colors ${
-              ethernetEnabled ? `bg-${accentColor}-500` : 'bg-gray-500'
+              ethernetEnabled ? 'bg-green-500' : 'bg-gray-500'
             }`}
           >
             {ethernetEnabled ? 'Connected' : 'Disconnected'}
-          </button>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -424,6 +452,127 @@ function Network() {
             Apply
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function Firewall() {
+  const { showNotification } = useNotification();
+  const { accentColor } = useTheme();
+  const { userId } = useAuth();
+  
+  // Define correct firewall settings
+  const CORRECT_SETTINGS = {
+    inbound: [80, 443, 22],
+    outbound: 'ALL'
+  };
+  
+  const [firewallEnabled, setFirewallEnabled] = useState(() => {
+    return localStorage.getItem('firewall_enabled') === 'true';
+  });
+  
+  const [inboundPorts, setInboundPorts] = useState(() => {
+    return localStorage.getItem('firewall_inbound') || '80, 443';
+  });
+  
+  const [outboundPolicy, setOutboundPolicy] = useState(() => {
+    return localStorage.getItem('firewall_outbound') || 'BLOCK';
+  });
+
+  // Apply changes and check if settings are correct
+  const handleApply = async () => {
+    showNotification('Applying firewall settings...', 'info', true);
+    
+    // Parse inbound ports and ensure proper formatting
+    const ports = inboundPorts.split(',')
+      .map(port => parseInt(port.trim()))
+      .filter(port => !isNaN(port))
+      .sort((a, b) => a - b);
+
+    // Ensure exact port match
+    const hasAllRequiredPorts = 
+      ports.length === CORRECT_SETTINGS.inbound.length &&
+      CORRECT_SETTINGS.inbound.every(port => ports.includes(port));
+
+    // Check if settings are correct
+    const isCorrect = 
+      hasAllRequiredPorts &&
+      outboundPolicy === CORRECT_SETTINGS.outbound;
+
+    if (isCorrect) {
+      const result = await completeTask(userId, 'firewall_config');
+      if (result.isFirstTime) {
+        const newTotal = await addPoints(userId!, 5);
+        showNotification(`Firewall configured correctly! Added 5 points! New total: ${newTotal}`, 'success');
+        unlockHint(userId!, 'firewall', 'config');
+        setFirewallEnabled(true);
+        localStorage.setItem('firewall_enabled', 'true');
+      } else {
+        showNotification('Firewall settings applied successfully', 'success');
+        setFirewallEnabled(true);
+        localStorage.setItem('firewall_enabled', 'true');
+      }
+    } else {
+      let errorMessage = 'Firewall configuration incorrect. ';
+      if (!hasAllRequiredPorts) {
+        errorMessage += '';
+      }
+      if (outboundPolicy !== CORRECT_SETTINGS.outbound) {
+        errorMessage += '';
+      }
+      errorMessage += 'System remains vulnerable.';
+      
+      showNotification(errorMessage, 'error');
+      setFirewallEnabled(false);
+      localStorage.setItem('firewall_enabled', 'false');
+    }
+
+    // Save settings regardless
+    localStorage.setItem('firewall_inbound', inboundPorts);
+    localStorage.setItem('firewall_outbound', outboundPolicy);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <span>Firewall Status</span>
+          <div className={`px-3 py-1 rounded ${firewallEnabled ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+            {firewallEnabled ? 'Protected' : 'Vulnerable'}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm">Inbound Ports (comma-separated)</label>
+          <input
+            type="text"
+            value={inboundPorts}
+            onChange={(e) => setInboundPorts(e.target.value)}
+            className={`w-full px-3 py-2 rounded bg-white/5 border border-${accentColor}-500/30 focus:border-${accentColor}-500`}
+            placeholder="80, 443, 22"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm">Outbound Policy</label>
+          <select
+            value={outboundPolicy}
+            onChange={(e) => setOutboundPolicy(e.target.value)}
+            className={`w-full px-3 py-2 rounded bg-white/5 border border-${accentColor}-500/30 focus:border-${accentColor}-500`}
+          >
+            <option value="BLOCK">BLOCK</option>
+            <option value="ALL">ALL</option>
+            <option value="NONE">NONE</option>
+          </select>
+        </div>
+
+        <button
+          onClick={handleApply}
+          className={`w-full px-4 py-2 rounded bg-${accentColor}-500/20 hover:bg-${accentColor}-500/30 text-${accentColor}-300 transition-colors`}
+        >
+          Apply Firewall Settings
+        </button>
       </div>
     </div>
   );
@@ -518,6 +667,7 @@ function DebugSection() {
 const categories: Category[] = [
   { id: 'appearance', name: 'Appearance', icon: '🎨', component: Appearance },
   { id: 'network', name: 'Network', icon: '🌐', component: Network },
+  { id: 'firewall', name: 'Firewall', icon: '🛡️', component: Firewall },
   { id: 'notifications', name: 'Notifications', icon: '🔔', component: Notifications },
   { id: 'privacy', name: 'Privacy', icon: '🔒', component: Privacy },
 ]; 

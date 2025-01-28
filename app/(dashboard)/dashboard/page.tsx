@@ -8,6 +8,7 @@ import Settings from '@/app/components/apps/Settings';
 import Notes from '@/app/components/apps/Notes';
 import Calculator from '@/app/components/apps/Calculator';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import Guide from '@/app/components/apps/Guide';
 
 interface Window {
   id: number;
@@ -58,19 +59,28 @@ export default function Dashboard() {
     { id: 3, title: 'Settings', icon: '⚙️', component: Settings },
     { id: 4, title: 'Notes', icon: '📝', component: Notes },
     { id: 5, title: 'Calculator', icon: '🧮', component: Calculator },
+    { id: 6, title: 'Guide', icon: '📖', component: Guide },
   ];
 
   useEffect(() => {
-    // Initialize icons in a 3x2 grid in the upper left
-    setIconPositions(apps.map((app, index) => {
-      const col = index % 3;  // 3 icons per row
-      const row = Math.floor(index / 3);
-      return {
-        id: app.id,
-        x: col * (GRID_SIZE + GRID_GAP) + 24, // 24px left padding
-        y: row * (GRID_SIZE + GRID_GAP) + 24, // 24px top padding
-      };
-    }));
+    const positionIcons = () => {
+      setIconPositions(apps.map((app, index) => {
+        const col = index % 3;  // 3 icons per row
+        const row = Math.floor(index / 3);
+        return {
+          id: app.id,
+          x: col * (GRID_SIZE + GRID_GAP) + 24,
+          y: row * (GRID_SIZE + GRID_GAP) + 24,
+        };
+      }));
+    };
+
+    // Position icons initially
+    positionIcons();
+
+    // Reposition on window resize
+    window.addEventListener('resize', positionIcons);
+    return () => window.removeEventListener('resize', positionIcons);
   }, []);
 
   const createWindow = (title: string, Component: () => JSX.Element) => {
@@ -153,13 +163,17 @@ export default function Dashboard() {
     e.preventDefault();
     if (draggedIcon !== null) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left - dragOffset.x;
-      const y = e.clientY - rect.top - dragOffset.y;
+      const rawX = e.clientX - rect.left - dragOffset.x;
+      const rawY = e.clientY - rect.top - dragOffset.y;
       
-      // Update icon position
+      // Snap to grid
+      const snappedX = Math.round(rawX / (GRID_SIZE + GRID_GAP)) * (GRID_SIZE + GRID_GAP) + 24;
+      const snappedY = Math.round(rawY / (GRID_SIZE + GRID_GAP)) * (GRID_SIZE + GRID_GAP) + 24;
+      
+      // Update icon position with snapped coordinates
       setIconPositions(prev => prev.map(pos => 
         pos.id === draggedIcon 
-          ? { ...pos, x: Math.max(0, x), y: Math.max(0, y) }
+          ? { ...pos, x: Math.max(0, snappedX), y: Math.max(0, snappedY) }
           : pos
       ));
     }

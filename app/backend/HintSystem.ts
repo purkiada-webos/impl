@@ -6,7 +6,7 @@ interface Hint {
   cost: number;
 }
 
-const HINT_COST = 5;
+const HINT_COST = 10;
 
 const hints: { [key: string]: Hint[] } = {
   'customization': [
@@ -25,8 +25,56 @@ const hints: { [key: string]: Hint[] } = {
       text: 'Change your background in Settings to make the OS feel more personal',
       cost: HINT_COST
     }
-  ]
-  // Add more categories and hints as needed
+  ],
+  'network': [
+    {
+      id: 'config',
+      text: 'Configure the network settings with IP: 192.168.1.42, Subnet: 255.255.255.0, and DNS: 8.8.4.4 to connect to the internet',
+      cost: HINT_COST
+    },
+    {
+      id: 'firewall',
+      text: 'Configure the firewall settings with inbound ports: 80, 443, 22 and outbound ports: ALL to secure your system',
+      cost: HINT_COST
+    }
+  ],
+  'terminal': [
+    {
+      id: 'package',
+      text: 'Try using the apt install command to install a package. Any package name will work!',
+      cost: HINT_COST
+    },
+    {
+      id: 'cd',
+      text: 'Use cd [directory] to change directories. Try cd documents to enter the documents folder.',
+      cost: HINT_COST
+    },
+    {
+      id: 'ls',
+      text: 'Use ls to list all files and directories in the current directory.',
+      cost: HINT_COST
+    },
+    {
+      id: 'mkdir',
+      text: 'Create a new directory using mkdir [name]. For example: mkdir projects',
+      cost: HINT_COST
+    },
+    {
+      id: 'cat',
+      text: 'Read file contents using cat [filename]. Try cat readme to view the readme file.',
+      cost: HINT_COST
+    },
+    {
+      id: 'echo',
+      text: 'Write to files using echo [text] > [filename]. For example: echo Hello > test.txt',
+      cost: HINT_COST
+    },
+    {
+      id: 'cp',
+      text: 'Copy files using cp [source] [destination]. For example: cp readme notes.txt',
+      cost: HINT_COST
+    }
+  ],
 };
 
 interface HintResult {
