@@ -319,10 +319,10 @@ export class OSFileSystem {
                                     type: "directory",
                                     children: {}
                                 },
-                                readme: {
-                                    name: "readme",
-                                    type: "file",
-                                    content: "Welcome to PurkOS Terminal!\n\nCommands:\ncd [path] - Change directory\nls - List contents\nmkdir [name] - Create directory\ntouch [name] - Create file\ncat [file] - Read file\necho [text] > [file] - Write to file\nclear - Clear screen\npwd - Print working directory"
+                                downloads: {
+                                    name: "downloads",
+                                    type: "directory",
+                                    children: {}
                                 }
                             }
                         }
